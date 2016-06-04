@@ -11,12 +11,12 @@ import (
 )
 
 type Job struct {
-	Id uint64
+	Id   uint64
 	Body []byte
 }
 
 type Gostalk struct {
-	conn net.Conn
+	conn   net.Conn
 	reader *bufio.Reader
 }
 
