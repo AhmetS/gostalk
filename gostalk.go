@@ -84,7 +84,6 @@ func (this *Gostalk) Reserve() (*Job, error) {
 	body := make([]byte, dataLen + 2) //+2 is for trailing \r\n
 	_, err = io.ReadFull(this.reader, body)
 	if err != nil {
-		log.Println("failed reading body:", err.Error())
 		return nil, err
 	}
 
