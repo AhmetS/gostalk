@@ -7,7 +7,8 @@ import (
 	"errors"
 	"strings"
 	"io"
-	"log"
+	//"net/textproto"
+	"time"
 )
 
 type Job struct {
@@ -18,9 +19,51 @@ type Job struct {
 type Gostalk struct {
 	conn   net.Conn
 	reader *bufio.Reader
+	//pipe   *textproto.Pipeline
 }
 
-var ReaderSize = 4096
+var ReaderSize = 65535
+
+// Sends a formatted command to beanstalkd and returns the received response
+func (this *Gostalk) sendReceive(format string, args ...interface{}) (res string, err error) {
+
+	//pipeId := this.pipe.Next()
+
+	//this.pipe.StartRequest(pipeId)
+	err = this.send(format, args...)
+	if err != nil {
+
+		//this.pipe.EndRequest(pipeId)
+		return
+	}
+	//this.pipe.EndRequest(pipeId)
+
+	//this.pipe.StartResponse(pipeId)
+	res, err = this.receiveLine()
+	res = strings.TrimSuffix(res, "\r\n")
+	//this.pipe.EndResponse(pipeId)
+
+	return
+}
+
+func (this *Gostalk) send(format string, args ...interface{}) (err error) {
+
+	_, err = fmt.Fprintf(this.conn, format, args...)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (this *Gostalk) receiveLine() (res string, err error) {
+
+	res, err = this.reader.ReadString('\n')
+
+	res = strings.TrimSuffix(res, "\r\n")
+
+	return
+}
 
 // Returns a new beanstalkd tcp connection and sets up a new buffered reader
 func Connect(addr string) (this *Gostalk, err error) {
@@ -39,7 +82,15 @@ func Connect(addr string) (this *Gostalk, err error) {
 // Disconnects from the beanstalkd server
 func (this *Gostalk) Disconnect() (err error) {
 
+	err = this.send("quit\r\n")
+	if err != nil {
+		return
+	}
+
 	err = this.conn.Close();
+	if err != nil {
+		return
+	}
 
 	return
 }
@@ -80,9 +131,7 @@ func (this *Gostalk) Reserve() (*Job, error) {
 		return nil, err
 	}
 
-	//read job body
-	body := make([]byte, dataLen + 2) //+2 is for trailing \r\n
-	_, err = io.ReadFull(this.reader, body)
+	body, err := this.handleReserveBody(dataLen)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +141,46 @@ func (this *Gostalk) Reserve() (*Job, error) {
 	job.Body = body[:len(body) - 2]
 
 	return job, nil
+}
+
+func (this *Gostalk) ReserveWithTimeout(duration time.Duration) (*Job, error) {
+
+	res, err := this.sendReceive("reserve-with-timeout %d\r\n", int(duration.Seconds()))
+	if err != nil {
+		return nil, err
+	}
+
+	var jobId uint64
+	var dataLen uint32
+	_, err = fmt.Sscanf(res, "RESERVED %d %d", &jobId, &dataLen)
+	if err != nil {
+		if res == "TIMED_OUT" {
+			return nil, errors.New(res)
+		}
+		return nil, err
+	}
+
+	body, err := this.handleReserveBody(dataLen)
+	if err != nil {
+		return nil, err
+	}
+
+	job := new(Job)
+	job.Id = jobId
+	job.Body = body
+
+	return job, nil
+}
+
+func (this *Gostalk) handleReserveBody(dataLen uint32) ([]byte, error) {
+	//read job body
+	body := make([]byte, dataLen + 2) //+2 is for trailing \r\n
+	_, err := io.ReadFull(this.reader, body)
+	if err != nil {
+		return nil, err
+	}
+
+	return body[:dataLen], nil
 }
 
 // Delete a job by it's id
@@ -174,21 +263,6 @@ func (this *Gostalk) Bury(jobId uint64, priority uint32) (err error) {
 	if res != expectedRes {
 		err = errors.New(fmt.Sprintf("Expected (%s), Got (%s)", expectedRes, res))
 	}
-
-	return
-}
-
-// Sends a formatted command to beanstalkd and returns the received response
-func (this *Gostalk) sendReceive(format string, args ...interface{}) (res string, err error) {
-	_, err = fmt.Fprintf(this.conn, format, args...)
-
-	if err != nil {
-		return
-	}
-
-	res, err = this.reader.ReadString('\n')
-
-	res = strings.TrimSuffix(res, "\r\n")
 
 	return
 }
