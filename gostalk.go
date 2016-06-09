@@ -97,10 +97,10 @@ func (this *Gostalk) Disconnect() (err error) {
 
 // Put is is for any process that wants to insert a job into the queue.
 // It takes the data, priority, delay, time to release
-func (this *Gostalk) Put(data []byte, priority uint32, delay int, ttr int) (uint64, error) {
+func (this *Gostalk) Put(data []byte, priority uint32, delay time.Duration, ttr time.Duration) (uint64, error) {
 
 	dataLen := len(data)
-	res, err := this.sendReceive("put %d %d %d %d\r\n%s\r\n", priority, delay, ttr, dataLen, data)
+	res, err := this.sendReceive("put %d %d %d %d\r\n%s\r\n", priority, int(delay.Seconds()), int(ttr.Seconds()), dataLen, data)
 	if err != nil {
 		return 0, err
 	}
