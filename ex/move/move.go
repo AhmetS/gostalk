@@ -6,12 +6,15 @@ import (
 	"time"
 )
 
+var tubeFrom string = "100k1"
+var tubeTo string = "100k"
+
 func main() {
 	consumer, err := gostalk.Connect("127.0.0.1:11300")
 	handleError(err)
 	defer consumer.Disconnect()
 
-	_, err = consumer.Watch("1m")
+	_, err = consumer.Watch(tubeFrom)
 	handleError(err)
 	consumer.Ignore("default")
 	handleError(err)
@@ -20,7 +23,7 @@ func main() {
 	handleError(err)
 	defer producer.Disconnect()
 
-	err = producer.Use("100k")
+	err = producer.Use(tubeTo)
 	handleError(err)
 
 	for {

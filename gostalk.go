@@ -19,7 +19,6 @@ type Job struct {
 type Gostalk struct {
 	conn   net.Conn
 	reader *bufio.Reader
-	//pipe   *textproto.Pipeline
 }
 
 var ReaderSize = 65535
@@ -27,21 +26,14 @@ var ReaderSize = 65535
 // Sends a formatted command to beanstalkd and returns the received response
 func (this *Gostalk) sendReceive(format string, args ...interface{}) (res string, err error) {
 
-	//pipeId := this.pipe.Next()
-
-	//this.pipe.StartRequest(pipeId)
 	err = this.send(format, args...)
 	if err != nil {
 
-		//this.pipe.EndRequest(pipeId)
 		return
 	}
-	//this.pipe.EndRequest(pipeId)
 
-	//this.pipe.StartResponse(pipeId)
 	res, err = this.receiveLine()
 	res = strings.TrimSuffix(res, "\r\n")
-	//this.pipe.EndResponse(pipeId)
 
 	return
 }
